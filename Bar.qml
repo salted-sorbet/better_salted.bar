@@ -1371,13 +1371,31 @@ Item {
                                 vRightIsland.visible ? vRightIsland.width : 0)
         implicitHeight: 1
 
+        // Top-to-bottom flow in section order. Sections can easily outgrow a
+        // 1080p strip together; centering the packed group keeps any overflow
+        // split evenly instead of letting islands pile onto each other.
+        readonly property real vGap: root.islandSideGap
+        readonly property real packedHeight: {
+          var total = 0
+          if (vLeftIsland.visible) total += vLeftIsland.height + vGap
+          if (vCenterIsland.visible) total += vCenterIsland.height + vGap
+          if (vRightIsland.visible) total += vRightIsland.height
+          return total
+        }
+        readonly property real flowOrigin: Math.max(0, Math.round((height - packedHeight) / 2))
+        readonly property real centerY: flowOrigin + (vLeftIsland.visible ? vLeftIsland.height + vGap : 0)
+        readonly property real rightY: centerY + (vCenterIsland.visible ? vCenterIsland.height + vGap : 0)
+
         IslandFrame {
           id: vLeftIsland
           region: "left"
+          externallyPositioned: true
+          externalY: flowOrigin
           hasContent: root.layoutEntries("left").length > 0
           contentWidth: vLeftMods.implicitWidth
+          contentHeight: vLeftMods.implicitHeight
 
-          ModuleRow {
+          ModuleColumn {
             id: vLeftMods
             anchors.centerIn: parent
             section: "left"
@@ -1388,10 +1406,13 @@ Item {
         IslandFrame {
           id: vCenterIsland
           region: "center"
+          externallyPositioned: true
+          externalY: centerY
           hasContent: root.layoutEntries("center").length > 0
           contentWidth: vCenterMods.implicitWidth
+          contentHeight: vCenterMods.implicitHeight
 
-          ModuleRow {
+          ModuleColumn {
             id: vCenterMods
             anchors.centerIn: parent
             section: "center"
@@ -1402,10 +1423,13 @@ Item {
         IslandFrame {
           id: vRightIsland
           region: "right"
+          externallyPositioned: true
+          externalY: rightY
           hasContent: root.layoutEntries("right").length > 0
           contentWidth: vRightMods.implicitWidth
+          contentHeight: vRightMods.implicitHeight
 
-          ModuleRow {
+          ModuleColumn {
             id: vRightMods
             anchors.centerIn: parent
             section: "right"
@@ -2120,6 +2144,23 @@ Item {
   // Plain Row of module slots. Lives outside ModuleList because island
   // sizing needs the Row's native implicitWidth — chaining through a Loader's
   // width binding proved unreliable while the registry loads asynchronously.
+  component ModuleColumn: Column {
+    id: columnRoot
+
+    property var entries: []
+    property string section: ""
+    spacing: 0
+
+    Repeater {
+      model: columnRoot.entries
+      ModuleSlot {
+        required property var modelData
+        entry: modelData
+        region: columnRoot.section
+      }
+    }
+  }
+
   component ModuleRow: Row {
     id: rowRoot
 
@@ -2154,6 +2195,14 @@ Item {
     readonly property real extra: root.islandExtraWidth(region)
     readonly property bool dragged: root.islandDragRegion === region
     readonly property bool dropHot: root.islandDropRegion === region
+    // The strip's length axis runs across the screen on horizontal edges and
+    // down the strip on vertical ones; thickness is always barSize.
+    readonly property bool stripVertical: root.vertical
+    // Vertical strips flow-position their islands top-to-bottom; the frame
+    // then takes its Y from the container instead of self-anchoring.
+    property bool externallyPositioned: false
+    property real externalY: 0
+    property real contentHeight: 0
 
     visible: hasContent || extra > 0
     // Horizontal strip: sections spread across the width. Vertical strip:
@@ -2162,6 +2211,7 @@ Item {
     x: root.vertical ? Math.round((parent.width - width) / 2)
        : region === "left" ? 0 : region === "right" ? parent.width - width : Math.round((parent.width - width) / 2)
     y: {
+      if (externallyPositioned) return externalY
       if (root.vertical) {
         if (region === "left") return 0
         if (region === "right") return parent.height - height
@@ -2169,8 +2219,10 @@ Item {
       }
       return root.position === "bottom" ? root.islandEdgeGap : 0
     }
-    width: Math.ceil(contentWidth) + root.islandPadH * 2 + extra
-    height: root.barSize
+    width: stripVertical ? Math.ceil(contentWidth) + root.islandPadH * 2
+                         : Math.ceil(contentWidth) + root.islandPadH * 2 + extra
+    height: stripVertical ? Math.ceil(contentHeight) + root.islandPadH * 2 + extra
+                          : root.barSize
     radius: root.islandRadius
     color: root.transparent ? Qt.alpha(root.background, 0.45) : root.background
     border.width: dropHot ? Math.max(2, root.islandOutlineWidth) : root.islandOutlineWidth
@@ -2264,12 +2316,12 @@ Item {
 
     IslandResizeHandle {
       region: frame.region
-      atRightEdge: false
+      atEndEdge: false
     }
 
     IslandResizeHandle {
       region: frame.region
-      atRightEdge: true
+      atEndEdge: true
     }
   }
 
@@ -2280,27 +2332,33 @@ Item {
     id: handle
 
     required property string region
-    required property bool atRightEdge
+    // True = sits at the far end of the island's length axis (right edge on
+    // horizontal strips, bottom edge on vertical ones).
+    required property bool atEndEdge
+    readonly property bool lengthVertical: root.vertical
 
-    property real startSceneX: 0
+    property real startSceneAxis: 0
 
-    width: 10
-    height: parent.height
-    x: atRightEdge ? parent.width - width : 0
+    width: lengthVertical ? parent.width : 10
+    height: lengthVertical ? 10 : parent.height
+    x: lengthVertical ? 0 : (atEndEdge ? parent.width - width : 0)
+    y: lengthVertical ? (atEndEdge ? parent.height - height : 0) : 0
     z: 40
     acceptedButtons: Qt.LeftButton
-    cursorShape: Qt.SizeHorCursor
+    cursorShape: lengthVertical ? Qt.SizeVerCursor : Qt.SizeHorCursor
     hoverEnabled: true
 
     onPressed: function(mouse) {
-      handle.startSceneX = mapToItem(null, mouse.x, mouse.y).x
+      var scene = mapToItem(null, mouse.x, mouse.y)
+      handle.startSceneAxis = lengthVertical ? scene.y : scene.x
     }
 
     onPositionChanged: function(mouse) {
       if (!(mouse.buttons & Qt.LeftButton)) return
-      var sceneX = mapToItem(null, mouse.x, mouse.y).x
-      var delta = sceneX - handle.startSceneX
-      var contribution = atRightEdge ? delta : -delta
+      var scene = mapToItem(null, mouse.x, mouse.y)
+      var axis = lengthVertical ? scene.y : scene.x
+      var delta = axis - handle.startSceneAxis
+      var contribution = atEndEdge ? delta : -delta
       var base = Number(root.islandWidths[region])
       if (!isFinite(base) || base < 0) base = 0
       root.setIslandWidthLive(region, base + contribution)
@@ -2310,10 +2368,10 @@ Item {
     onCanceled: root.clearIslandWidthLive()
 
     Rectangle {
+      anchors.horizontalCenter: parent.horizontalCenter
       anchors.verticalCenter: parent.verticalCenter
-      x: handle.atRightEdge ? parent.width - width : 0
-      width: 2
-      height: parent.height * 0.4
+      width: handle.lengthVertical ? 2 : parent.width
+      height: handle.lengthVertical ? parent.height : 2
       radius: 1
       color: Color.accent
       opacity: handle.pressed || handle.containsMouse ? 0.85 : 0
