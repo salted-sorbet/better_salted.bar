@@ -1194,7 +1194,12 @@ Item {
       right: root.position === "right" || !root.vertical
     }
 
-    implicitWidth: root.vertical ? root.barSize + (root.islandsActive ? root.islandEdgeGap : 0) : 0
+    // Vertical islands can be far wider than the strip is thick: the window
+    // must wrap the widest island or every pill clips at the layer boundary.
+    implicitWidth: root.vertical
+      ? ((root.islandsActive && barLayoutLoader.item && barLayoutLoader.item.implicitWidth > 0)
+         ? barLayoutLoader.item.implicitWidth + root.islandEdgeGap : root.barSize)
+      : 0
     implicitHeight: root.vertical ? 0 : (root.barSize + (root.islandsActive ? root.islandEdgeGap : 0))
     color: root.islandsActive || root.transparent ? "transparent" : root.background
     surfaceFormat.opaque: false
@@ -1202,6 +1207,8 @@ Item {
     WlrLayershell.layer: WlrLayer.Top
 
     Loader {
+      id: barLayoutLoader
+
       anchors.fill: parent
       sourceComponent: !root.vertical ? horizontalBar : (root.islandsActive ? verticalIslandBar : verticalBar)
 
@@ -1356,6 +1363,13 @@ Item {
           center: vCenterIsland,
           right: vRightIsland
         })
+
+        // Measurement-only: anchors.fill pins the rendered size; this informs
+        // the enclosing PanelWindow how wide the strip must be.
+        implicitWidth: Math.max(vLeftIsland.visible ? vLeftIsland.width : 0,
+                                vCenterIsland.visible ? vCenterIsland.width : 0,
+                                vRightIsland.visible ? vRightIsland.width : 0)
+        implicitHeight: 1
 
         IslandFrame {
           id: vLeftIsland
