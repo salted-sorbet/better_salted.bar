@@ -67,6 +67,7 @@ Item {
   property bool islandsEnabled: false
   property int islandEdgeGap: 8
   property int islandSideGap: 8
+  property int islandSectionGap: 16
   property int islandRadius: 9
   property int islandPadH: 12
   property int islandOutlineWidth: 1
@@ -349,6 +350,12 @@ Item {
   function commitIslandWidth(region) {
     var value = islandWidthLive[region]
     clearIslandWidthLive()
+
+    Qt.callLater(function() {
+      console.warn("[bsb] MODULES L=" + vLeftMods.height + "/" + vLeftMods.implicitHeight +
+        " C=" + vCenterMods.height + "/" + vCenterMods.implicitHeight +
+        " R=" + vRightMods.height + "/" + vRightMods.implicitHeight)
+    })
     if (value === undefined || !root.shell || typeof root.shell.mutateShellConfig !== "function") return
 
     var extra = Math.max(0, Math.round(Number(value)))
@@ -497,6 +504,7 @@ Item {
     islandsEnabled = islands.enabled === true
     islandEdgeGap = islandPositiveInt(islands.edgeGap, 8)
     islandSideGap = islandPositiveInt(islands.sideGap, 8)
+    islandSectionGap = islandPositiveInt(islands.sectionGap, 16)
     islandRadius = islandPositiveInt(islands.radius, 9)
     islandPadH = islandPositiveInt(islands.padding, 12)
     var outlineN = Number(islands.outlineWidth)
@@ -1374,7 +1382,7 @@ Item {
         // Top-to-bottom flow in section order. Sections can easily outgrow a
         // 1080p strip together; centering the packed group keeps any overflow
         // split evenly instead of letting islands pile onto each other.
-        readonly property real vGap: root.islandSideGap
+        readonly property real vGap: root.islandSectionGap
         readonly property real packedHeight: {
           var total = 0
           if (vLeftIsland.visible) total += vLeftIsland.height + vGap
@@ -1382,6 +1390,7 @@ Item {
           if (vRightIsland.visible) total += vRightIsland.height
           return total
         }
+
         readonly property real flowOrigin: Math.max(0, Math.round((height - packedHeight) / 2))
         readonly property real centerY: flowOrigin + (vLeftIsland.visible ? vLeftIsland.height + vGap : 0)
         readonly property real rightY: centerY + (vCenterIsland.visible ? vCenterIsland.height + vGap : 0)
@@ -1393,7 +1402,7 @@ Item {
           externalY: flowOrigin
           hasContent: root.layoutEntries("left").length > 0
           contentWidth: vLeftMods.implicitWidth
-          contentHeight: vLeftMods.implicitHeight
+          contentHeight: root.layoutEntries("left").length * root.barSize
 
           ModuleColumn {
             id: vLeftMods
@@ -1410,7 +1419,7 @@ Item {
           externalY: centerY
           hasContent: root.layoutEntries("center").length > 0
           contentWidth: vCenterMods.implicitWidth
-          contentHeight: vCenterMods.implicitHeight
+          contentHeight: root.layoutEntries("center").length * root.barSize
 
           ModuleColumn {
             id: vCenterMods
@@ -1427,7 +1436,7 @@ Item {
           externalY: rightY
           hasContent: root.layoutEntries("right").length > 0
           contentWidth: vRightMods.implicitWidth
-          contentHeight: vRightMods.implicitHeight
+          contentHeight: root.layoutEntries("right").length * root.barSize
 
           ModuleColumn {
             id: vRightMods
@@ -2144,23 +2153,35 @@ Item {
   // Plain Row of module slots. Lives outside ModuleList because island
   // sizing needs the Row's native implicitWidth — chaining through a Loader's
   // width binding proved unreliable while the registry loads asynchronously.
-  component ModuleColumn: Column {
+  component ModuleColumn: Item {
     id: columnRoot
 
     property var entries: []
     property string section: ""
-    spacing: 0
 
-    Repeater {
-      model: columnRoot.entries
-      ModuleSlot {
-        required property var modelData
-        entry: modelData
-        region: columnRoot.section
-        height: root.barSize
+    implicitWidth: grid.implicitWidth
+    implicitHeight: entries.length * root.barSize
+    clip: true
+
+    Column {
+      id: grid
+      anchors.left: parent.left
+      anchors.right: parent.right
+      anchors.top: parent.top
+
+      Repeater {
+        model: columnRoot.entries
+        ModuleSlot {
+          required property var modelData
+          entry: modelData
+          region: columnRoot.section
+          height: root.barSize
+          implicitHeight: root.barSize
+        }
       }
     }
   }
+
 
   component ModuleRow: Row {
     id: rowRoot
