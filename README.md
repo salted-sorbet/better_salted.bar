@@ -2,7 +2,7 @@
 
 A modular floating-island bar for [Omarchy](https://omarchy.org), built on the stock `omarchy.bar`.
 
-![Better Salted Bar](preview.png)
+![Better Salted Bar](preview.png?v=2)
 
 Instead of one bar strip glued to the screen edge, your widgets live on **three independent rounded islands** (left / center / right sections) that float off the edge with configurable gaps and an optional outline for dark wallpapers.
 
