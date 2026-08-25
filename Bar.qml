@@ -2157,6 +2157,7 @@ Item {
         required property var modelData
         entry: modelData
         region: columnRoot.section
+        height: root.barSize
       }
     }
   }
