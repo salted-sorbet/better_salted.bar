@@ -1377,7 +1377,7 @@ Item {
         implicitWidth: Math.max(vLeftIsland.visible ? vLeftIsland.width : 0,
                                 vCenterIsland.visible ? vCenterIsland.width : 0,
                                 vRightIsland.visible ? vRightIsland.width : 0)
-        implicitHeight: 1
+        implicitHeight: Math.max(packedHeight, 1)
 
         // Top-to-bottom flow in section order. Sections can easily outgrow a
         // 1080p strip together; centering the packed group keeps any overflow
@@ -1888,6 +1888,7 @@ Item {
     implicitHeight: activeItem && activeItem.visible ? activeItem.implicitHeight : 0
     // Vertical columns cap each slot at barSize; the wrapper clips overflow.
     property real forcedHeight: -1
+    readonly property bool centered: forcedHeight > 0
     width: implicitWidth
     height: forcedHeight > 0 ? forcedHeight : implicitHeight
     z: modulePointer.dragging ? 100 : 0
@@ -1917,6 +1918,11 @@ Item {
       anchors.fill: parent
       opacity: slot.dragSource ? 0.22 : 1.0
       onLoaded: {
+        if (slot.centered && item) {
+          item.anchors.fill = undefined
+          item.x = Math.round((slot.width - item.width) / 2)
+          item.y = Math.round((slot.height - item.height) / 2)
+        }
         slot.injectProps()
         Qt.callLater(slot.injectProps)
       }
@@ -1929,6 +1935,11 @@ Item {
       anchors.fill: parent
       opacity: slot.dragSource ? 0.22 : 1.0
       onLoaded: {
+        if (slot.centered && item) {
+          item.anchors.fill = undefined
+          item.x = Math.round((slot.width - item.width) / 2)
+          item.y = Math.round((slot.height - item.height) / 2)
+        }
         slot.injectProps()
         Qt.callLater(slot.injectProps)
       }
@@ -1941,6 +1952,11 @@ Item {
       anchors.fill: parent
       opacity: slot.dragSource ? 0.22 : 1.0
       onLoaded: {
+        if (slot.centered && item) {
+          item.anchors.fill = undefined
+          item.x = Math.round((slot.width - item.width) / 2)
+          item.y = Math.round((slot.height - item.height) / 2)
+        }
         slot.injectProps()
         Qt.callLater(slot.injectProps)
       }
@@ -2155,32 +2171,21 @@ Item {
   // Plain Row of module slots. Lives outside ModuleList because island
   // sizing needs the Row's native implicitWidth — chaining through a Loader's
   // width binding proved unreliable while the registry loads asynchronously.
-  component ModuleColumn: Item {
+  component ModuleColumn: Column {
     id: columnRoot
 
     property var entries: []
     property string section: ""
 
-    implicitWidth: innerCol.implicitWidth
-    implicitHeight: entries.length * root.barSize
-    clip: true
+    spacing: 0
 
     Repeater {
-      id: innerCol
       model: columnRoot.entries
-      Item {
+      ModuleSlot {
         required property var modelData
-        required property int index
-        y: index * root.barSize
-        height: root.barSize
-        width: columnRoot.width
-        clip: true
-        ModuleSlot {
-          entry: modelData
-          region: columnRoot.section
-          forcedHeight: root.barSize
-          anchors.fill: parent
-        }
+        entry: modelData
+        region: columnRoot.section
+        forcedHeight: root.barSize
       }
     }
   }
