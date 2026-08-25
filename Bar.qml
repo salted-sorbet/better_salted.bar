@@ -1343,8 +1343,11 @@ Item {
     Component {
       id: verticalIslandBar
 
+      // Same id as the horizontal surface on purpose: IslandFrame's drag
+      // handler resolves `barSurface.islandsById` through its enclosing scope,
+      // and each Component is its own scope, so the name never collides.
       Item {
-        id: verticalSurface
+        id: barSurface
 
         anchors.fill: parent
 
