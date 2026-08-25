@@ -1886,8 +1886,10 @@ Item {
     }
     implicitWidth: activeItem && activeItem.visible ? (root.vertical ? root.barSize : activeItem.implicitWidth) : 0
     implicitHeight: activeItem && activeItem.visible ? activeItem.implicitHeight : 0
+    // Vertical columns cap each slot at barSize; the wrapper clips overflow.
+    property real forcedHeight: -1
     width: implicitWidth
-    height: implicitHeight
+    height: forcedHeight > 0 ? forcedHeight : implicitHeight
     z: modulePointer.dragging ? 100 : 0
 
     Component.onCompleted: root.registerModuleSlot(slot)
@@ -2159,24 +2161,25 @@ Item {
     property var entries: []
     property string section: ""
 
-    implicitWidth: grid.implicitWidth
+    implicitWidth: innerCol.implicitWidth
     implicitHeight: entries.length * root.barSize
     clip: true
 
-    Column {
-      id: grid
-      anchors.left: parent.left
-      anchors.right: parent.right
-      anchors.top: parent.top
-
-      Repeater {
-        model: columnRoot.entries
+    Repeater {
+      id: innerCol
+      model: columnRoot.entries
+      Item {
+        required property var modelData
+        required property int index
+        y: index * root.barSize
+        height: root.barSize
+        width: columnRoot.width
+        clip: true
         ModuleSlot {
-          required property var modelData
           entry: modelData
           region: columnRoot.section
-          height: root.barSize
-          implicitHeight: root.barSize
+          forcedHeight: root.barSize
+          anchors.fill: parent
         }
       }
     }
